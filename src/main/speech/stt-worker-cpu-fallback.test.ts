@@ -99,4 +99,18 @@ describe('GPU speech process falling back to the CPU', () => {
     gpu.emit('exit', 1)
     expect(children[1].posted.map((m) => m.type)).toEqual(['init', 'discard'])
   })
+
+  it('reports an idle GPU process killed between dictations instead of moving it to the CPU', () => {
+    const { worker, children, marks } = setup()
+    const [gpu] = children
+    const exits: number[] = []
+    worker.on('exit', (code: number) => exits.push(code))
+    gpu.emit('message', { type: 'ready' })
+    worker.postMessage({ type: 'stop' })
+    gpu.emit('message', { type: 'stopped' })
+    gpu.emit('exit', 137)
+    expect(children).toHaveLength(1)
+    expect(exits).toEqual([137])
+    expect(marks()).toBe(0)
+  })
 })

@@ -41,13 +41,7 @@ export function getSpeechEngineModulesDir(engine: SpeechEngine): string | null {
   return speechNodeModulesDirCandidates().find((dir) => hasSpeechEnginePackage(dir, engine)) ?? null
 }
 
-/** With a model: whether its engine ships here. Without: whether any on-device engine does. */
-export function hasLocalSpeechRecognizer(model?: { files?: readonly string[] }): boolean {
-  if (model) {
-    return getSpeechEngineModulesDir(speechEngineForModelFiles(model.files ?? [])) !== null
-  }
-  return (
-    getSpeechEngineModulesDir('transcribe-cpp') !== null ||
-    getSpeechEngineModulesDir('sherpa') !== null
-  )
+/** Whether this host ships the engine `model` runs on. */
+export function hasLocalSpeechRecognizer(model: { files?: readonly string[] }): boolean {
+  return getSpeechEngineModulesDir(speechEngineForModelFiles(model.files ?? [])) !== null
 }

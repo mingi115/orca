@@ -445,12 +445,13 @@ module.exports = {
       writeMacBuildCompatibility(resourcesDir, { version, commit, architecture })
     }
     stampPackagedCliVersion(resourcesDir, context.packager.appInfo.version)
-    prunePackagedRuntimeNodeModules(resourcesDir, context.electronPlatformName, context.arch)
+    // Before the prune, which drops the copied packages' type declarations too.
     copyPackagedTranscribeCpp(
       resourcesDir,
       context.electronPlatformName,
       normalizeElectronArchitecture(context.arch)
     )
+    prunePackagedRuntimeNodeModules(resourcesDir, context.electronPlatformName, context.arch)
     assertNoWindowsExecutablesInRuntimeNodeModules(resourcesDir, context.electronPlatformName)
     // Gate native glibc floor after pruning foreign CPU variants; GLIBC_2.34 once broke Ubuntu 20.04 startup (#9902).
     let appImageNodeRuntime = null

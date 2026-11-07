@@ -29,7 +29,7 @@ describe('speech worker paths on orcad (#31174)', () => {
   it('has no on-device recognizer unless orca serve names one', () => {
     installFakeAppEnvironment({ isPackaged: () => true })
     expect(getSpeechEngineModulesDir('sherpa')).toBeNull()
-    expect(hasLocalSpeechRecognizer()).toBe(false)
+    expect(hasLocalSpeechRecognizer({ files: ['model.int8.onnx'] })).toBe(false)
   })
 
   it("uses the installed app's recognizer that orca serve names", () => {

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { speechEngineForModelFiles } from '../../shared/speech-model-engine'
+import { OFFLINE_DECODE_CHUNK_SECONDS } from './stt-offline-audio-chunker'
 import type { SttWorkerProcess } from './stt-worker-process'
 
 export type SpawnSttChild = (options: { cpuOnly: boolean }) => SttWorkerProcess
@@ -59,6 +60,10 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
       this.armStallTimer()
     } else if (msg.type === 'feed' && this.canFallBack()) {
       this.buffered.push(msg)
+      // A full chunk is waiting, so the GPU should be decoding; arm before the backlog outgrows a replay.
+      if (!this.stallTimer && this.bufferedSeconds() > OFFLINE_DECODE_CHUNK_SECONDS) {
+        this.armStallTimer()
+      }
     } else if (msg.type === 'stop' || msg.type === 'discard') {
       this.pending = msg.type
       if (msg.type === 'stop') {
@@ -81,6 +86,7 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
   private canFallBack(): boolean {
     return (
       !this.cpuOnly &&
+      !this.exitRequested &&
       this.init?.type === 'init' &&
       speechEngineForModelFiles(this.init.files ?? []) === 'transcribe-cpp'
     )
@@ -91,7 +97,9 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
     const onError = (error: Error): void =>
       this.canFallBack() ? this.fallBack(true) : this.forwardError(error)
     const onExit = (code: number): void => {
-      if (this.canFallBack() && !this.exitRequested) {
+      // An idle process killed from outside (OOM, Activity Monitor) is not a GPU failure.
+      const busy = !this.ready || this.pending !== null || this.buffered.length > 0
+      if (this.canFallBack() && busy) {
         this.fallBack(true)
       } else {
         this.emit('exit', code)
@@ -110,6 +118,9 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
 
   private receive(message: ChildMessage): void {
     if (message.type === 'chunk') {
+      if (this.pending !== 'stop') {
+        this.clearStallTimer()
+      }
       this.trimBuffered(message.samples)
       if (message.text) {
         this.emit('message', { type: 'final', text: message.text })
@@ -176,6 +187,10 @@ class SttCpuFallbackWorker extends EventEmitter implements SttWorkerProcess {
       this.buffered.shift()
       this.bufferedStart = end
     }
+  }
+
+  private bufferedSeconds(): number {
+    return this.buffered.reduce((total, feed) => total + feed.samples.length / feed.sampleRate, 0)
   }
 
   private armStallTimer(): void {

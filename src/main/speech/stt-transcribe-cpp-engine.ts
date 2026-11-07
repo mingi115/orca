@@ -59,9 +59,21 @@ export async function createTranscribeCppEngine(
   let inputRate = modelRate
   let decodedSamples = 0
 
+  const transcribeChunk = async (chunk: Float32Array): Promise<string> => {
+    try {
+      return (await session.run(chunk, options)).text
+    } catch (error) {
+      // Repetition loops (Whisper on noise) and length caps are about this audio, not the GPU; keep what decoded.
+      if (error instanceof transcribe.OutputTruncated) {
+        return error.partialResult?.text ?? ''
+      }
+      throw error
+    }
+  }
+
   // Coverage is in input-rate samples so the host can trim the audio it keeps for a CPU replay.
   const decode = async (chunk: Float32Array): Promise<void> => {
-    const { text } = await session.run(chunk, options)
+    const text = await transcribeChunk(chunk)
     decodedSamples += chunk.length
     post({
       type: 'chunk',
