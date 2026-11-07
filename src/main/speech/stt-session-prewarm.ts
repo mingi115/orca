@@ -13,7 +13,10 @@ export function prewarmSttModel(
 ): Promise<void> {
   const warming = (state.warming ?? Promise.resolve())
     .then(() => warmSttModel(state, modelId, language))
-    .catch((error: unknown) => console.warn('[speech] Model pre-warm failed:', modelId, error))
+    .catch((error: unknown) => {
+      state.prewarmFailedModelId = modelId
+      console.warn('[speech] Model pre-warm failed:', modelId, error)
+    })
     .finally(() => {
       if (state.warming === warming) {
         state.warming = null
@@ -54,7 +57,13 @@ async function warmSttModel(
   if (state.worker) {
     await teardownSttWorker(state, state.worker)
   }
-  if (!localModel || !ready || state.worker || isSttSessionBusy(state)) {
+  if (
+    !localModel ||
+    !ready ||
+    state.prewarmFailedModelId === modelId ||
+    state.worker ||
+    isSttSessionBusy(state)
+  ) {
     return
   }
   await launchSttWorker(state, modelId, localModel, undefined, engineLanguage, null)

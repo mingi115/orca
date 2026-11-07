@@ -1,26 +1,21 @@
 import { useId } from 'react'
 import type { SpeechModelManifest, VoiceSettings } from '../../../../../shared/speech-types'
 import {
-  DEFAULT_UNLOAD_MODEL_AFTER_MINUTES,
-  UNLOAD_MODEL_AFTER_MINUTES_CHOICES
+  UNLOAD_MODEL_AFTER_MINUTES_CHOICES,
+  unloadModelAfterMinutes,
+  type UnloadModelAfterMinutes
 } from '../../../../../shared/voice-model-unload'
 import { translate } from '@/i18n/i18n'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import { SettingsRow } from '../form-controls/SettingsFormControls'
 
-type UnloadChoice = (typeof UNLOAD_MODEL_AFTER_MINUTES_CHOICES)[number]
-
 const NEVER_VALUE = 'never'
 
-function isUnloadChoice(value: number | null | undefined): value is UnloadChoice {
-  return UNLOAD_MODEL_AFTER_MINUTES_CHOICES.some((minutes) => minutes === value)
-}
-
-function choiceValue(minutes: UnloadChoice): string {
+function choiceValue(minutes: UnloadModelAfterMinutes): string {
   return minutes === null ? NEVER_VALUE : String(minutes)
 }
 
-function choiceLabel(minutes: UnloadChoice): string {
+function choiceLabel(minutes: UnloadModelAfterMinutes): string {
   switch (minutes) {
     case null:
       return translate('components.settings.voice.modelUnload.never', 'Never')
@@ -48,8 +43,7 @@ export function VoiceModelUnloadSetting({
 }: VoiceModelUnloadSettingProps): React.JSX.Element {
   const labelId = useId()
   const isCloudModel = selectedModel?.provider === 'openai'
-  const saved: number | null | undefined = voiceSettings.unloadModelAfterMinutes
-  const current = isUnloadChoice(saved) ? saved : DEFAULT_UNLOAD_MODEL_AFTER_MINUTES
+  const current = unloadModelAfterMinutes(voiceSettings)
 
   return (
     <SettingsRow

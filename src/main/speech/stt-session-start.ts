@@ -58,6 +58,7 @@ export async function startSttDictation(
       throw new Error('dictation_canceled')
     }
     state.activeOwner = owner
+    state.prewarmFailedModelId = null
   } finally {
     state.starting = false
     state.startingOwner = null

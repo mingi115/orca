@@ -30,6 +30,8 @@ export type SttSessionState = {
   idleUnloadMs: number | null
   /** A model pre-warm in flight; starts wait for it so they reuse its worker. */
   warming: Promise<void> | null
+  /** Pre-warm skips a model that failed to load until a dictation loads it, so focus does not retry it forever. */
+  prewarmFailedModelId: string | null
   stopInFlight: StopInFlight | null
   stopping: boolean
   cleanupWorkerLifecycleListeners: (() => void) | null
@@ -57,6 +59,7 @@ export function createSttSessionState(
     idleTeardownTimer: null,
     idleUnloadMs: voiceModelUnloadDelayMs(undefined),
     warming: null,
+    prewarmFailedModelId: null,
     stopInFlight: null,
     stopping: false,
     cleanupWorkerLifecycleListeners: null

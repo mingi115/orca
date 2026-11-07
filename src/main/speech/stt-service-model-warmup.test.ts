@@ -20,7 +20,11 @@ vi.mock('./model-catalog', () => ({
 type FakeChild = { worker: SttWorkerChildProcess; inits: number; killed: boolean }
 
 function createService(
-  options: { status?: SpeechModelStatus; answerInit?: boolean; answerStop?: boolean } = {}
+  options: {
+    status?: SpeechModelStatus
+    answerInit?: boolean | 'error'
+    answerStop?: boolean
+  } = {}
 ): {
   service: SttService
   children: FakeChild[]
@@ -35,7 +39,9 @@ function createService(
           const type = Reflect.get(message, 'type')
           if (type === 'init') {
             child.inits += 1
-            if (options.answerInit !== false) {
+            if (options.answerInit === 'error') {
+              queueMicrotask(() => child.worker.receiveMessage({ type: 'error', error: 'bad' }))
+            } else if (options.answerInit !== false) {
               queueMicrotask(() => child.worker.receiveMessage({ type: 'ready' }))
             }
           } else if ((type === 'stop' || type === 'discard') && options.answerStop !== false) {
@@ -62,6 +68,7 @@ function createService(
 describe('SttService model pre-warm', () => {
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   it('loads the model before the first dictation, which then reuses it', async () => {
@@ -124,6 +131,16 @@ describe('SttService model pre-warm', () => {
     await Promise.all([warming, cancel])
     expect(children).toHaveLength(1)
     expect(children[0].killed).toBe(false)
+  })
+
+  it('does not retry pre-warming a model that failed to load', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { service, children } = createService({ answerInit: 'error' })
+
+    await service.prewarm('model-a')
+    await service.prewarm('model-a')
+
+    expect(children).toHaveLength(1)
   })
 
   it('does not load a model that is not downloaded', async () => {

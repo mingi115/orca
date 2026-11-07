@@ -119,6 +119,10 @@ export async function initializeReadyRuntimeServices(): Promise<void> {
   runAfterFirstWindowShown(() => {
     void runGatedWslMoveDesktopRewritePass({ userDataPath: app.getPath('userData') })
   }, WORKTREE_TRASH_SWEEP_FALLBACK_MS)
+  // Load the dictation model after first paint; coming back to Orca re-warms one the idle timer unloaded.
+  runAfterFirstWindowShown(() => {
+    app.on('browser-window-focus', startSpeechModelWarmup(store))
+  }, WORKTREE_TRASH_SWEEP_FALLBACK_MS)
   nativeTheme.themeSource = store.getSettings().theme ?? 'system'
   // Wait for shell PATH before probing Codex; start reconciliation early so first launch can share it.
   startCodexHooks({
