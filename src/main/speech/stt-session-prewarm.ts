@@ -33,30 +33,31 @@ async function warmSttModel(
     return
   }
   const manifest = getCatalogModel(modelId)
-  if (!manifest || !isLocalSpeechModel(manifest) || !getSherpaModulePath()) {
-    return
-  }
-  const engineLanguage = engineDictationLanguage(manifest, language)
+  const localModel =
+    manifest && isLocalSpeechModel(manifest) && getSherpaModulePath() ? manifest : null
+  const engineLanguage = localModel ? engineDictationLanguage(localModel, language) : undefined
   // Same key startSttSession reuses a warm worker by; desktop and phone starts pass no hotwords.
   const isWarm = (): boolean =>
     state.worker !== null &&
     state.activeModelId === modelId &&
     state.activeHotwordsFilePath === undefined &&
     state.activeLanguage === engineLanguage
-  if (isWarm()) {
+  if (localModel && isWarm()) {
     return
   }
-  const modelState = await state.modelManager.getModelState(modelId)
-  if (modelState.status !== 'ready' || isSttSessionBusy(state)) {
+  const ready =
+    localModel !== null && (await state.modelManager.getModelState(modelId)).status === 'ready'
+  if (isSttSessionBusy(state)) {
     return
   }
+  // The idle worker holds a model that is no longer the selected one.
   if (state.worker) {
     await teardownSttWorker(state, state.worker)
   }
-  if (state.worker || isSttSessionBusy(state)) {
+  if (!localModel || !ready || state.worker || isSttSessionBusy(state)) {
     return
   }
-  await launchSttWorker(state, modelId, manifest, undefined, engineLanguage, null)
+  await launchSttWorker(state, modelId, localModel, undefined, engineLanguage, null)
   if (isWarm() && !isSttSessionBusy(state)) {
     scheduleSttIdleTeardown(state)
   }
