@@ -11,7 +11,8 @@ import {
   stopSttDictation,
   teardownSttWorker
 } from './stt-session-stop'
-import { getSherpaModulePath, LOCAL_SPEECH_UNAVAILABLE_ERROR } from './stt-worker-paths'
+import { speechEngineForModelFiles } from '../../shared/speech-model-engine'
+import { getSpeechEngineModulesDir, LOCAL_SPEECH_UNAVAILABLE_ERROR } from './stt-worker-paths'
 import {
   attachSttWorkerLifecycle,
   initializeSttWorker,
@@ -134,8 +135,9 @@ async function startSttSession(
     throw new Error(`Model not ready: ${modelState.status}`)
   }
 
-  const sherpaModulePath = getSherpaModulePath()
-  if (!sherpaModulePath) {
+  const files = manifest.files ?? []
+  const speechModulesDir = getSpeechEngineModulesDir(speechEngineForModelFiles(files))
+  if (!speechModulesDir) {
     throw new Error(LOCAL_SPEECH_UNAVAILABLE_ERROR)
   }
   const worker = state.spawnWorker()
@@ -162,12 +164,12 @@ async function startSttSession(
     }
   })
   initializeSttWorker(worker, {
-    sherpaModulePath,
+    speechModulesDir,
     modelDir: state.modelManager.getModelDir(modelId),
     modelType: manifest.type,
     streaming: manifest.streaming,
     sampleRate: manifest.sampleRate,
-    files: manifest.files ?? [],
+    files,
     hotwordsFilePath,
     modelingUnit: manifest.modelingUnit,
     language: engineLanguage

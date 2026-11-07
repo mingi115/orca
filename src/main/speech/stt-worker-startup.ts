@@ -1,4 +1,5 @@
 import type { SttEvent } from './stt-service'
+import type { SttEngineInit } from './stt-worker-engine'
 import type { SttWorkerProcess } from './stt-worker-process'
 
 export function waitForSttWorkerReady(worker: SttWorkerProcess, timeoutMs: number): Promise<void> {
@@ -81,19 +82,6 @@ export function attachSttWorkerLifecycle(args: {
   }
 }
 
-export function initializeSttWorker(
-  worker: SttWorkerProcess,
-  input: {
-    sherpaModulePath: string
-    modelDir: string
-    modelType: string
-    streaming: boolean
-    sampleRate: number
-    files: readonly string[]
-    hotwordsFilePath?: string
-    modelingUnit?: string
-    language?: string
-  }
-): void {
+export function initializeSttWorker(worker: SttWorkerProcess, input: SttEngineInit): void {
   worker.postMessage({ type: 'init', ...input })
 }

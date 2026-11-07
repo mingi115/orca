@@ -20,9 +20,11 @@ const {
   assertPackagedNativeVariantsInstalled,
   assertProcessHostOutputBuilt,
   createPackagedRuntimeNodeModuleResources,
+  normalizeElectronArchitecture,
   prunePackagedRuntimeNodeModules,
   verifyPackagedMainRuntimeDeps
 } = require('./packaged-runtime-node-modules.cjs')
+const { copyPackagedTranscribeCpp } = require('./packaged-transcribe-cpp.cjs')
 const {
   assertNoWindowsExecutablesInRuntimeNodeModules
 } = require('./packaged-windows-only-runtime-files.cjs')
@@ -330,7 +332,7 @@ module.exports = {
     // extraResources already ships plugin bytes; exclude source duplicates.
     '!resources/plugins/launch/**',
     // Platform extraResources selects speech natives; asar would duplicate it and ship other variants.
-    '!node_modules/sherpa-onnx*{,/**/*}',
+    '!node_modules/{sherpa-onnx*,transcribe-cpp,@transcribe-cpp,koffi,@koromix}{,/**/*}',
     // CLI shim belongs beside resources/bin/orca.exe; unpacking source creates a second .cmd without its executable (#7351).
     '!resources/win32{,/**/*}'
   ],
@@ -444,6 +446,11 @@ module.exports = {
     }
     stampPackagedCliVersion(resourcesDir, context.packager.appInfo.version)
     prunePackagedRuntimeNodeModules(resourcesDir, context.electronPlatformName, context.arch)
+    copyPackagedTranscribeCpp(
+      resourcesDir,
+      context.electronPlatformName,
+      normalizeElectronArchitecture(context.arch)
+    )
     assertNoWindowsExecutablesInRuntimeNodeModules(resourcesDir, context.electronPlatformName)
     // Gate native glibc floor after pruning foreign CPU variants; GLIBC_2.34 once broke Ubuntu 20.04 startup (#9902).
     let appImageNodeRuntime = null

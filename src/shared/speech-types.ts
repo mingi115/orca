@@ -70,6 +70,8 @@ export type UserModelConfig = {
 
 export type DictationMode = 'toggle' | 'hold'
 
+export type SpeechGpuMode = 'auto' | 'off'
+
 export type VoiceSettings = {
   enabled: boolean
   sttModel: string
@@ -84,4 +86,6 @@ export type VoiceSettings = {
   microphoneDeviceId: string | null
   /** Cached label for display when the preferred device is unplugged */
   microphoneDeviceLabel: string | null
+  /** 'off' keeps on-device recognition on the CPU, for machines whose GPU driver hard-crashes. Absent = 'auto'. */
+  speechGpu?: SpeechGpuMode
 }

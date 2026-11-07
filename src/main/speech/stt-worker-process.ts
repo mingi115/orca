@@ -58,6 +58,16 @@ export class SttWorkerChildProcess extends EventEmitter implements SttWorkerProc
   }
 }
 
+/** Env for a speech child: CPU-only skips GPU backend registration, which can itself crash a driver. */
+export function sttWorkerEnv(options: { cpuOnly: boolean }): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ...(options.cpuOnly ? { TRANSCRIBE_BACKENDS: 'cpu' } : {}),
+    // Implicit Vulkan layers (overlays, capture tools) crash some drivers' speech compute (Handy #2049).
+    ...(process.platform === 'win32' ? { VK_LOADER_LAYERS_DISABLE: '~implicit~' } : {})
+  }
+}
+
 export function logSttWorkerStderr(stderr: NodeJS.ReadableStream | null | undefined): void {
   stderr?.on('data', (chunk: Buffer) => {
     console.error('[speech-worker]', String(chunk).trimEnd())

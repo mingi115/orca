@@ -2,18 +2,19 @@ import { fork } from 'node:child_process'
 import { getSttWorkerPath } from './stt-worker-paths'
 import {
   logSttWorkerStderr,
+  sttWorkerEnv,
   SttWorkerChildProcess,
   type SttWorkerProcess
 } from './stt-worker-process'
 
 /** For orcad, which has no Electron utility processes. */
-export function spawnSttForkedProcess(): SttWorkerProcess {
+export function spawnSttForkedProcess(options: { cpuOnly: boolean }): SttWorkerProcess {
   const child = fork(getSttWorkerPath(), [], {
     // Structured clone keeps feed audio a Float32Array.
     serialization: 'advanced',
     execArgv: [],
     stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: { ...sttWorkerEnv(options), ELECTRON_RUN_AS_NODE: '1' },
     ...(process.platform === 'win32' ? { windowsHide: true } : {})
   })
   const worker = new SttWorkerChildProcess({
