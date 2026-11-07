@@ -1,10 +1,16 @@
 import type { ModelManager } from './model-manager'
 import type { SpawnSttWorkerProcess } from './stt-worker-process'
+import { prewarmSttModel } from './stt-session-prewarm'
 import { startSttDictation } from './stt-session-start'
-import { createSttSessionState, type SttSessionState } from './stt-session-state'
-import { prepareSttModelForDeletion, stopSttDictation } from './stt-session-stop'
+import { createSttSessionState, isSttSessionBusy, type SttSessionState } from './stt-session-state'
+import {
+  prepareSttModelForDeletion,
+  scheduleSttIdleTeardown,
+  stopSttDictation,
+  teardownIdleSttWorker
+} from './stt-session-stop'
 
-export { IDLE_WORKER_TEARDOWN_MS, START_DICTATION_TIMEOUT_MS } from './stt-session-timeouts'
+export { START_DICTATION_TIMEOUT_MS } from './stt-session-timeouts'
 
 export type SttEvent =
   | { type: 'ready' }
@@ -67,5 +73,26 @@ export class SttService {
 
   prepareModelForDeletion(modelId: string): Promise<void> {
     return prepareSttModelForDeletion(this.state, modelId)
+  }
+
+  /** The one warm-up entry point; an engine that needs a first inference to be fast does it behind this. */
+  prewarm(modelId: string, language?: string): Promise<void> {
+    return prewarmSttModel(this.state, modelId, language)
+  }
+
+  /** null keeps an idle model loaded; 0 unloads it as soon as a dictation ends. */
+  setIdleUnloadDelay(ms: number | null): void {
+    if (this.state.idleUnloadMs === ms) {
+      return
+    }
+    this.state.idleUnloadMs = ms
+    // An in-flight pre-warm schedules its own unload once loaded.
+    if (this.state.worker && !this.state.warming && !isSttSessionBusy(this.state)) {
+      scheduleSttIdleTeardown(this.state)
+    }
+  }
+
+  unloadIdleModel(): Promise<void> {
+    return teardownIdleSttWorker(this.state)
   }
 }

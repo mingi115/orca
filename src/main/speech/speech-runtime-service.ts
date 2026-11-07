@@ -1,6 +1,7 @@
 import type { ModelManager } from './model-manager'
 import type { SttService } from './stt-service'
 import type { VoiceSettings } from '../../shared/speech-types'
+import { voiceModelUnloadDelayMs } from '../../shared/voice-model-unload'
 
 /** Hosts inject Chromium/Node download factories; missing services reject per call rather than appearing to transcribe. */
 
@@ -44,6 +45,12 @@ export function getSpeechModelManager(store: SpeechSettingsStore): ModelManager 
 export function getSpeechSttService(store: SpeechSettingsStore): SttService {
   if (!sttService) {
     sttService = requireFactories().createSttService(getSpeechModelManager(store))
+    sttService.setIdleUnloadDelay(voiceModelUnloadDelayMs(store.getSettings().voice))
   }
+  return sttService
+}
+
+/** The service only if something already created it, so a host with voice off never builds one. */
+export function findSpeechSttService(): SttService | null {
   return sttService
 }

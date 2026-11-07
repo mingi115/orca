@@ -1,4 +1,5 @@
 import { engineDictationLanguage } from '../../shared/dictation-language'
+import type { SpeechModelManifest } from '../../shared/speech-types'
 import { getCatalogModel } from './model-catalog'
 import { OpenAiTranscriptionSession } from './openai-transcription-client'
 import { readOpenAiSpeechApiKey } from './openai-api-key-store'
@@ -40,9 +41,13 @@ export async function startSttDictation(
   state.starting = true
   state.startingOwner = owner
   state.startingModelId = modelId
-  clearSttIdleTeardownTimer(state)
 
   try {
+    // A pre-warm is loading the worker this start would load; reuse it instead of loading twice.
+    if (state.warming) {
+      await state.warming
+    }
+    clearSttIdleTeardownTimer(state)
     await startSttSession(state, modelId, sink, hotwordsFilePath, owner, language)
     if (state.canceledOwners.delete(owner)) {
       await stopSttDictation(state, owner, { cancelStarting: false, discard: true })
@@ -133,7 +138,18 @@ async function startSttSession(
   if (modelState.status !== 'ready') {
     throw new Error(`Model not ready: ${modelState.status}`)
   }
+  await launchSttWorker(state, modelId, manifest, hotwordsFilePath, engineLanguage, sink)
+}
 
+/** Spawns a worker for a downloaded local model and resolves once it has loaded the model. */
+export async function launchSttWorker(
+  state: SttSessionState,
+  modelId: string,
+  manifest: SpeechModelManifest,
+  hotwordsFilePath: string | undefined,
+  engineLanguage: string | undefined,
+  sink: SttEventSink | null
+): Promise<void> {
   const sherpaModulePath = getSherpaModulePath()
   if (!sherpaModulePath) {
     throw new Error(LOCAL_SPEECH_UNAVAILABLE_ERROR)

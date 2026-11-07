@@ -1,7 +1,6 @@
 import type { SttSessionState } from './stt-session-state'
 import type { SttWorkerProcess } from './stt-worker-process'
 import { waitForSttWorkerStop, type SttWorkerStopOutcome } from './stt-worker-stop'
-import { IDLE_WORKER_TEARDOWN_MS } from './stt-session-timeouts'
 
 const STOP_DICTATION_TIMEOUT_MS = 60_000
 // A cancel waits only this long behind a busy decode, then kills the worker.
@@ -149,15 +148,18 @@ export function clearSttIdleTeardownTimer(state: SttSessionState): void {
   }
 }
 
-function scheduleSttIdleTeardown(state: SttSessionState): void {
+export function scheduleSttIdleTeardown(state: SttSessionState): void {
   clearSttIdleTeardownTimer(state)
+  if (state.idleUnloadMs === null) {
+    return
+  }
   state.idleTeardownTimer = setTimeout(() => {
     void teardownIdleSttWorker(state)
-  }, IDLE_WORKER_TEARDOWN_MS)
+  }, state.idleUnloadMs)
   state.idleTeardownTimer.unref?.()
 }
 
-async function teardownIdleSttWorker(state: SttSessionState): Promise<void> {
+export async function teardownIdleSttWorker(state: SttSessionState): Promise<void> {
   clearSttIdleTeardownTimer(state)
   if (!state.worker || state.activeOwner || state.startingOwner) {
     return
