@@ -130,6 +130,7 @@ export async function prepareSttModelForDeletion(
   state: SttSessionState,
   modelId: string
 ): Promise<void> {
+  await settleSttPrewarm(state)
   if (state.startingModelId === modelId || (state.activeOwner && state.activeModelId === modelId)) {
     throw new Error('voice_model_in_use')
   }
@@ -138,6 +139,13 @@ export async function prepareSttModelForDeletion(
     if (state.worker && state.activeModelId === modelId) {
       throw new Error('voice_model_in_use')
     }
+  }
+}
+
+// Killing a worker mid-load drops the listener its ready wait settles on; let the load finish first.
+async function settleSttPrewarm(state: SttSessionState): Promise<void> {
+  if (state.warming) {
+    await state.warming
   }
 }
 
@@ -160,6 +168,7 @@ export function scheduleSttIdleTeardown(state: SttSessionState): void {
 }
 
 export async function teardownIdleSttWorker(state: SttSessionState): Promise<void> {
+  await settleSttPrewarm(state)
   clearSttIdleTeardownTimer(state)
   if (!state.worker || state.activeOwner || state.startingOwner) {
     return

@@ -46,6 +46,10 @@ export async function startSttDictation(
     // A pre-warm is loading the worker this start would load; reuse it instead of loading twice.
     if (state.warming) {
       await state.warming
+      // A cancel during the wait already stopped the warm worker; replacing it would load the model twice.
+      if (state.canceledOwners.has(owner)) {
+        throw new Error('dictation_canceled')
+      }
     }
     clearSttIdleTeardownTimer(state)
     await startSttSession(state, modelId, sink, hotwordsFilePath, owner, language)

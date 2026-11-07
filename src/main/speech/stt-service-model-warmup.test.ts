@@ -19,7 +19,9 @@ vi.mock('./model-catalog', () => ({
 
 type FakeChild = { worker: SttWorkerChildProcess; inits: number; killed: boolean }
 
-function createService(options: { status?: SpeechModelStatus; answerInit?: boolean } = {}): {
+function createService(
+  options: { status?: SpeechModelStatus; answerInit?: boolean; answerStop?: boolean } = {}
+): {
   service: SttService
   children: FakeChild[]
 } {
@@ -36,7 +38,7 @@ function createService(options: { status?: SpeechModelStatus; answerInit?: boole
             if (options.answerInit !== false) {
               queueMicrotask(() => child.worker.receiveMessage({ type: 'ready' }))
             }
-          } else if (type === 'stop' || type === 'discard') {
+          } else if ((type === 'stop' || type === 'discard') && options.answerStop !== false) {
             queueMicrotask(() => child.worker.receiveMessage({ type: 'stopped' }))
           }
         },
@@ -90,6 +92,38 @@ describe('SttService model pre-warm', () => {
 
     expect(children).toHaveLength(1)
     expect(sink).toHaveBeenCalledWith({ type: 'ready' })
+  })
+
+  it('lets a loading model finish before unloading it, so the next dictation is not stuck', async () => {
+    const { service, children } = createService({ answerInit: false })
+
+    const warming = service.prewarm('model-a')
+    await vi.waitFor(() => expect(children[0]?.inits).toBe(1))
+    const unload = service.unloadIdleModel()
+    children[0].worker.receiveMessage({ type: 'ready' })
+    await Promise.all([warming, unload])
+    expect(children[0].killed).toBe(true)
+
+    const start = service.startDictation('model-a', vi.fn(), undefined, 'desktop')
+    await vi.waitFor(() => expect(children[1]?.inits).toBe(1))
+    children[1].worker.receiveMessage({ type: 'ready' })
+    await start
+  })
+
+  it('cancels a dictation that waited on a pre-warm without loading the model again', async () => {
+    const { service, children } = createService({ answerInit: false, answerStop: false })
+
+    const warming = service.prewarm('model-a')
+    await vi.waitFor(() => expect(children[0]?.inits).toBe(1))
+    const start = service.startDictation('model-a', vi.fn(), undefined, 'desktop')
+    const cancel = service.stopDictation('desktop', { discard: true })
+    // The worker answers the cancel only after it has finished loading.
+    children[0].worker.receiveMessage({ type: 'ready' })
+    await expect(start).rejects.toThrow('dictation_canceled')
+    children[0].worker.receiveMessage({ type: 'stopped' })
+    await Promise.all([warming, cancel])
+    expect(children).toHaveLength(1)
+    expect(children[0].killed).toBe(false)
   })
 
   it('does not load a model that is not downloaded', async () => {
